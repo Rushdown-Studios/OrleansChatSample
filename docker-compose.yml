@@ -1,0 +1,77 @@
+services:
+
+  dynamodb-local:
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    image: "amazon/dynamodb-local:latest"
+    container_name: dynamodb-local
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./docker/dynamodb:/home/dynamodblocal/data"
+    working_dir: /home/dynamodblocal
+    networks:
+      - local-rushdown
+
+  rushdown-reverse-proxy:
+    container_name: rushdown-reverse-proxy
+    build:
+      context: ./
+      dockerfile: ./RushdownReverseProxy/Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      ASPNETCORE_HTTP_PORTS: 5000
+    networks:
+      - local-rushdown
+
+  rpc-server-1:
+    container_name: rpc-server-1
+    build:
+      context: ./
+      dockerfile: ./RushdownRpc/Dockerfile
+      args:
+        - BUILD_CONFIGURATION=Release
+    ports:
+      - "21111:21111"
+      - "30001:30001"
+      - "11111:11111"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_HTTP_PORTS: 21111
+      SILO_PORT: 11111
+      GATEWAY_PORT: 30001
+      DYNAMODB_CONNECTION_STRING: "http://dynamodb-local:8000"
+      AWS_ACCESS_KEY_ID: "placeholder"
+      AWS_SECRET_ACCESS_KEY: "placeholder"
+    depends_on:
+      - "dynamodb-local"
+    networks:
+      - local-rushdown
+
+  rpc-server-2:
+    container_name: rpc-server-2
+    build:
+      context: ./
+      dockerfile: ./RushdownRpc/Dockerfile
+      args:
+        - BUILD_CONFIGURATION=Release
+    ports:
+      - "21112:21112"
+      - "30002:30002"
+      - "11112:11112"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_HTTP_PORTS: 21112
+      SILO_PORT: 11112
+      GATEWAY_PORT: 30002
+      DYNAMODB_CONNECTION_STRING: "http://dynamodb-local:8000"
+      AWS_ACCESS_KEY_ID: "placeholder"
+      AWS_SECRET_ACCESS_KEY: "placeholder"
+    depends_on:
+      - "dynamodb-local"
+    networks:
+      - local-rushdown
+
+networks:
+  local-rushdown:
+    driver: bridge
