@@ -85,39 +85,37 @@ internal class WebSocketService(
 
     public async Task PublishMessage(Guid[] playerIds, ChatMessage message)
     {
-        var tasks = new List<Task>();
         var semaphore = new SemaphoreSlim(10);
+        var messageText = JsonConvert.SerializeObject(message);
+        var messageBytes = Encoding.UTF8.GetBytes(messageText);
+        var tasks = playerIds.Select(SendMessageAsync).ToList();
+        await Task.WhenAll(tasks);
 
-        for (var i = 0; i < playerIds.Length; i++)
+        async Task SendMessageAsync(Guid playerId)
         {
-            if (_connections.TryGetValue(playerIds[i], out var webSocketDetails))
+            if (!_connections.TryGetValue(playerId, out var webSocketDetails))
+                return;
+
+            await semaphore.WaitAsync();
+
+            try
             {
-                var messageText = JsonConvert.SerializeObject(message);
-                var messageBytes = Encoding.UTF8.GetBytes(messageText);
+                await webSocketDetails.WebSocket.SendAsync(
+                    buffer: new ArraySegment<byte>(messageBytes),
+                    messageType: WebSocketMessageType.Text,
+                    endOfMessage: true,
+                    cancellationToken: webSocketDetails.CancellationTokenSource.Token);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to send message to {playerId}: {exMessage}", playerId, ex.Message);
+            }
+            finally
+            {
+                semaphore.Release();
 
-                await semaphore.WaitAsync();
-
-                var task = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await webSocketDetails.WebSocket.SendAsync(
-                            buffer: new ArraySegment<byte>(messageBytes),
-                            messageType: WebSocketMessageType.Text,
-                            endOfMessage: true,
-                            cancellationToken: webSocketDetails.CancellationTokenSource.Token);
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
-                });
-
-                tasks.Add(task);
             }
         }
-
-        await Task.WhenAll(tasks);
     }
 
     private async Task AddOrUpdateWebSocket(Guid playerIds, WebSocketDetails newWebSocketDetails)
