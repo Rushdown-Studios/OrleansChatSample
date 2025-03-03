@@ -44,16 +44,12 @@ internal class WebSocketService(
 
     public async Task ReceiveLoopAsync(Guid playerId, WebSocket webSocket)
     {
-        var playerGrain = _clusterClient.GetGrain<IPlayerGrain>(playerId);
-
-        _logger.LogInformation("User connected {userId}", playerId.ToString());
-
         try
         {
             _logger.LogInformation("User connected {userId}", playerId.ToString());
             var playerGrain = _clusterClient.GetGrain<IPlayerGrain>(playerId);
-
             var buffer = new byte[_bufferSizeKb];
+
             var receiveResult = await webSocket.ReceiveAsync(
                 buffer: new ArraySegment<byte>(buffer),
                 cancellationToken: CancellationToken.None);
@@ -134,9 +130,6 @@ internal class WebSocketService(
             finally
             {
                 semaphore.Release();
-                    }
-                });
-
             }
         }
     }
@@ -150,7 +143,6 @@ internal class WebSocketService(
                 await existingWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Replaced by new connection", CancellationToken.None);
             }
         }
-
         _connections[playerIds] = newWebSocket;
     }
 }
