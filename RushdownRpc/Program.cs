@@ -1,41 +1,39 @@
 using RushdownRpc.Services;
-using System.Net;
+using RushdownRpc;
 using System.Net.Sockets;
 
-var hostName = Dns.GetHostName();
-var ip = Dns.GetHostEntry(hostName).AddressList.FirstOrDefault(x => x.AddressFamily == AddressFamily.InterNetwork);
+var siloPort = int.Parse(Environment.GetEnvironmentVariable(Names.SiloPort) 
+    ?? throw new Exception($"{Names.SiloPort} missing!"));
 
-var siloPort = int.Parse(Environment.GetEnvironmentVariable("SILO_PORT") ?? throw new Exception());
-var gatewayPort = int.Parse(Environment.GetEnvironmentVariable("GATEWAY_PORT") ?? throw new Exception());
+var gatewayPort = int.Parse(Environment.GetEnvironmentVariable(Names.GatewayPort) 
+    ?? throw new Exception($"{Names.GatewayPort} missing!"));
 
-var dynamoDb = Environment.GetEnvironmentVariable("DYNAMODB_CONNECTION_STRING");
+var dynamoDb = Environment.GetEnvironmentVariable(Names.DynamoDbConnectionString) 
+    ?? throw new Exception($"{Names.DynamoDbConnectionString} missing!");
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.UseOrleans(siloBuilder =>
 {
-    siloBuilder.UseDynamoDBClustering(options =>
-    {
-        options.Service = dynamoDb;
-    })
-    .AddDynamoDBGrainStorage("GrainState", options =>
-    {
-        options.Service = dynamoDb;
-    })
-    .ConfigureEndpoints(siloPort, gatewayPort, AddressFamily.InterNetwork);
+    siloBuilder.UseDynamoDBClustering(options => { options.Service = dynamoDb; })
+        .AddDynamoDBGrainStorage("GrainState", options => { options.Service = dynamoDb; })
+        .ConfigureEndpoints(siloPort, gatewayPort, AddressFamily.InterNetwork);
+});
+
+builder.Logging.AddSimpleConsole(options =>
+{
+    options.IncludeScopes = false;
+    options.SingleLine = true;
 });
 
 builder.Services.AddControllers();
 builder.Services.AddSingleton<IWebSocketService, WebSocketService>();
 builder.Services.AddHostedService<SiloSetupWorker>();
 
-var webSocketOptions = new WebSocketOptions
-{
-    KeepAliveInterval = TimeSpan.FromMinutes(2)
-};
-
 var app = builder.Build();
-app.UseWebSockets(webSocketOptions);
+app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromMinutes(2) });
 app.MapControllers();
 app.UseRouting();
 app.Run();
+
+public partial class Program;

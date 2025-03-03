@@ -4,11 +4,11 @@
 public interface IPlayerGrain : IGrainWithGuidKey
 {
     [Alias("SendMessage")]
-    Task SendMessage(Guid channelId, string message);
+    Task SendMessage(string message);
 
     [Alias("JoinChannel")]
-    Task JoinChannel(Guid channelId, SiloAddress siloAddress);
+    Task JoinChannel(string channelId, SiloAddress siloAddress);
 
     [Alias("LeaveChannel")]
-    Task LeaveChannel(Guid channelId, SiloAddress siloAddress);
+    Task LeaveChannel(SiloAddress siloAddress);
 }

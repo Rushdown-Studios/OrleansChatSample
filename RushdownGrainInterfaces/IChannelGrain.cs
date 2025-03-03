@@ -4,11 +4,11 @@ namespace RushdownGrainInterfaces;
 
 [GenerateSerializer]
 [Alias("RushdownGrainInterfaces.ChatMessage")]
-public readonly struct ChatMessage(Guid sender, string message)
+public readonly struct ChatMessage(Guid senderId, string message)
 {
     [Id(0)]
     [JsonProperty("sender")]
-    public readonly Guid Sender = sender;
+    public readonly Guid SenderId = senderId;
 
     [Id(1)]
     [JsonProperty("message")]
@@ -16,7 +16,7 @@ public readonly struct ChatMessage(Guid sender, string message)
 }
 
 [Alias("RushdownGrainInterfaces.IChannelGrain")]
-public interface IChannelGrain : IGrainWithGuidKey
+public interface IChannelGrain : IGrainWithStringKey
 {
     [Alias("JoinChannel")]
     Task JoinChannel(Guid UserId, SiloAddress siloAddress);

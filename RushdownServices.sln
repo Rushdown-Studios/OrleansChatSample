@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RushdownGrains", "RushdownG
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RushdownReverseProxy", "RushdownReverseProxy\RushdownReverseProxy.csproj", "{F5FB66E1-D5A1-4EEE-9BE2-399105481688}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebSocketClient", "WebSocketClient\WebSocketClient.csproj", "{CA26867E-3184-4001-ACD0-CC5F96830762}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{F5FB66E1-D5A1-4EEE-9BE2-399105481688}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F5FB66E1-D5A1-4EEE-9BE2-399105481688}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F5FB66E1-D5A1-4EEE-9BE2-399105481688}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CA26867E-3184-4001-ACD0-CC5F96830762}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CA26867E-3184-4001-ACD0-CC5F96830762}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CA26867E-3184-4001-ACD0-CC5F96830762}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CA26867E-3184-4001-ACD0-CC5F96830762}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

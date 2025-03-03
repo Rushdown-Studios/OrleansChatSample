@@ -1,6 +1,22 @@
-﻿using System.Net.WebSockets;
+﻿using Newtonsoft.Json;
+using System.Net.WebSockets;
 
 namespace RushdownRpc.Services;
+
+public readonly struct CommandType
+{
+    public const string Channel = "channel";
+    public const string ChatMessage = "chat_message";
+}
+
+public struct Command
+{
+    [JsonProperty("type")]
+    public string Type;
+
+    [JsonProperty("data")]
+    public string Data;
+}
 
 /// <summary>
 /// Interface for the internal service that manages websocket connections and lifetime
@@ -20,7 +36,7 @@ public interface IWebSocketService
     /// <param name="webSocket"></param>
     /// <param name="cancellationTokenSource"></param>
     /// <returns></returns>
-    Task AddConnection(Guid playerId, WebSocket webSocket, CancellationTokenSource cancellationTokenSource);
+    Task AddConnection(Guid playerId, WebSocket webSocket);
 
     /// <summary>
     /// Start an async task to receive websocket messages
@@ -29,5 +45,5 @@ public interface IWebSocketService
     /// <param name="webSocket"></param>
     /// <param name="cancellationTokenSource"></param>
     /// <returns></returns>
-    Task ReceiveLoopAsync(Guid playerId, WebSocket webSocket, CancellationTokenSource cancellationTokenSource);
+    Task ReceiveLoopAsync(Guid playerId, WebSocket webSocket);
 }

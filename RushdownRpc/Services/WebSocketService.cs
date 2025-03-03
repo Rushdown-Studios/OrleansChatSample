@@ -14,9 +14,10 @@ internal class WebSocketService(
 {
     private readonly ILocalSiloDetails _localSiloDetails = localSiloDetails;
     private readonly IClusterClient _clusterClient = clusterClient;
-    private readonly ConcurrentDictionary<Guid, WebSocketDetails> _connections = new();
-    private readonly Guid _channelId = Guid.Parse("e7f4d5dc-6aa7-4a83-b2ed-4d12d8983447");
+    private readonly ConcurrentDictionary<Guid, WebSocket> _connections = new();
+    private readonly string _defaultChannelId = "global";
     private readonly ILogger<IWebSocketService> _logger = logger;
+    private const int _bufferSizeKb = 1024 * 4;
 
     public async Task Init()
     {
@@ -25,11 +26,11 @@ internal class WebSocketService(
         await publisherGrain.Subscribe(observerReference);
     }
 
-    public async Task AddConnection(Guid playerId, WebSocket webSocket, CancellationTokenSource cancellationTokenSource)
+    public async Task AddConnection(Guid playerId, WebSocket webSocket)
     {
-        await AddOrUpdateWebSocket(playerId, new WebSocketDetails(webSocket, cancellationTokenSource));
+        await AddOrUpdateWebSocket(playerId, webSocket);
         var playerGrain = _clusterClient.GetGrain<IPlayerGrain>(playerId);
-        await playerGrain.JoinChannel(_channelId, _localSiloDetails.SiloAddress);
+        await playerGrain.JoinChannel(_defaultChannelId, _localSiloDetails.SiloAddress);
     }
 
     private async Task RemoveConnection(Guid playerId)
@@ -37,44 +38,60 @@ internal class WebSocketService(
         if (_connections.TryRemove(playerId, out var _))
         {
             var playerGrain = _clusterClient.GetGrain<IPlayerGrain>(playerId);
-            await playerGrain.LeaveChannel(_channelId, _localSiloDetails.SiloAddress);
+            await playerGrain.LeaveChannel(_localSiloDetails.SiloAddress);
         }
     }
 
-    public async Task ReceiveLoopAsync(Guid playerId, WebSocket webSocket, CancellationTokenSource cancellationTokenSource)
+    public async Task ReceiveLoopAsync(Guid playerId, WebSocket webSocket)
     {
-        var playerGrain = _clusterClient.GetGrain<IPlayerGrain>(playerId);
-
-        _logger.LogInformation("User connected {userId}", playerId.ToString());
-
         try
         {
-            var buffer = new byte[1024 * 4];
+            _logger.LogInformation("User connected {userId}", playerId.ToString());
+            var playerGrain = _clusterClient.GetGrain<IPlayerGrain>(playerId);
+
+            var buffer = new byte[_bufferSizeKb];
             var receiveResult = await webSocket.ReceiveAsync(
                 buffer: new ArraySegment<byte>(buffer),
-                cancellationToken: cancellationTokenSource.Token);
+                cancellationToken: CancellationToken.None);
 
             while (!receiveResult.CloseStatus.HasValue)
             {
                 if (receiveResult.MessageType == WebSocketMessageType.Text)
                 {
                     string message = Encoding.UTF8.GetString(buffer, 0, receiveResult.Count);
-                    await playerGrain.SendMessage(_channelId, message);
+                    var command = JsonConvert.DeserializeObject<Command>(message);
+                    if (command.Type == CommandType.Channel)
+                    {
+                        await playerGrain.LeaveChannel(_localSiloDetails.SiloAddress);
+                        await playerGrain.JoinChannel(command.Data, _localSiloDetails.SiloAddress);
+                    }
+                    else if (command.Type == CommandType.ChatMessage)
+                    {
+                        await playerGrain.SendMessage(command.Data);
+                    }
+                    else
+                    {
+                        _logger.LogError("Invalid command type = {commandType}", command.Type);
+                    }
                 }
 
                 receiveResult = await webSocket.ReceiveAsync(
                     buffer: new ArraySegment<byte>(buffer),
-                    cancellationToken: cancellationTokenSource.Token);
+                    cancellationToken: CancellationToken.None);
             }
 
             await webSocket.CloseAsync(
                 closeStatus: receiveResult.CloseStatus.Value,
                 statusDescription: receiveResult.CloseStatusDescription,
-                cancellationToken: cancellationTokenSource.Token);
+                cancellationToken: CancellationToken.None);
         }
         catch (WebSocketException)
         {
             // The remote party closed the WebSocket connection without completing the close handshake
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("{ex}", ex);
         }
         finally
         {
@@ -87,31 +104,33 @@ internal class WebSocketService(
     {
         var tasks = new List<Task>();
         var semaphore = new SemaphoreSlim(10);
+        var messageText = JsonConvert.SerializeObject(message);
+        var messageBytes = Encoding.UTF8.GetBytes(messageText);
+        var tasks = playerIds.Select(SendMessageAsync).ToList();
+        await Task.WhenAll(tasks);
 
-        for (var i = 0; i < playerIds.Length; i++)
+        async Task SendMessageAsync(Guid playerId)
         {
-            if (_connections.TryGetValue(playerIds[i], out var webSocketDetails))
-            {
-                var messageText = JsonConvert.SerializeObject(message);
-                var messageBytes = Encoding.UTF8.GetBytes(messageText);
+            if (!_connections.TryGetValue(playerId, out var webSocket))
+                return;
 
                 await semaphore.WaitAsync();
 
-                var task = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await webSocketDetails.WebSocket.SendAsync(
-                            buffer: new ArraySegment<byte>(messageBytes),
-                            messageType: WebSocketMessageType.Text,
-                            endOfMessage: true,
-                            cancellationToken: webSocketDetails.CancellationTokenSource.Token);
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
-                });
+            try
+            {
+                await webSocket.SendAsync(
+                    buffer: new ArraySegment<byte>(messageBytes),
+                    messageType: WebSocketMessageType.Text,
+                    endOfMessage: true,
+                    cancellationToken: CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to send message to {playerId}: {exMessage}", playerId, ex.Message);
+            }
+            finally
+            {
+                semaphore.Release();
 
                 tasks.Add(task);
             }
@@ -120,22 +139,16 @@ internal class WebSocketService(
         await Task.WhenAll(tasks);
     }
 
-    private async Task AddOrUpdateWebSocket(Guid playerIds, WebSocketDetails newWebSocketDetails)
+    private async Task AddOrUpdateWebSocket(Guid playerIds, WebSocket newWebSocket)
     {
-        if (_connections.TryGetValue(playerIds, out var existingWebSocketDetails))
+        if (_connections.TryGetValue(playerIds, out var existingWebSocket))
         {
-            if (existingWebSocketDetails.WebSocket.State == WebSocketState.Open)
+            if (existingWebSocket.State == WebSocketState.Open)
             {
-                await existingWebSocketDetails.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Replaced by new connection", CancellationToken.None);
+                await existingWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Replaced by new connection", CancellationToken.None);
             }
         }
 
-        _connections[playerIds] = newWebSocketDetails;
-    }
-
-    private class WebSocketDetails(WebSocket webSocket, CancellationTokenSource cancellationTokenSource)
-    {
-        public readonly WebSocket WebSocket = webSocket;
-        public readonly CancellationTokenSource CancellationTokenSource = cancellationTokenSource;
+        _connections[playerIds] = newWebSocket;
     }
 }

@@ -14,8 +14,8 @@ public class WebSocketController(IWebSocketService webSocketService) : Controlle
         {
             using var cts = new CancellationTokenSource();
             using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-            await _webSocketService.AddConnection(userId, webSocket, cts);
-            await _webSocketService.ReceiveLoopAsync(userId, webSocket, cts);
+            await _webSocketService.AddConnection(userId, webSocket);
+            await _webSocketService.ReceiveLoopAsync(userId, webSocket);
         }
         else
         {
