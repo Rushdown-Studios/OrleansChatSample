@@ -44,6 +44,10 @@ internal class WebSocketService(
 
     public async Task ReceiveLoopAsync(Guid playerId, WebSocket webSocket)
     {
+        var playerGrain = _clusterClient.GetGrain<IPlayerGrain>(playerId);
+
+        _logger.LogInformation("User connected {userId}", playerId.ToString());
+
         try
         {
             _logger.LogInformation("User connected {userId}", playerId.ToString());
@@ -102,7 +106,6 @@ internal class WebSocketService(
 
     public async Task PublishMessage(Guid[] playerIds, ChatMessage message)
     {
-        var tasks = new List<Task>();
         var semaphore = new SemaphoreSlim(10);
         var messageText = JsonConvert.SerializeObject(message);
         var messageBytes = Encoding.UTF8.GetBytes(messageText);
@@ -113,8 +116,8 @@ internal class WebSocketService(
         {
             if (!_connections.TryGetValue(playerId, out var webSocket))
                 return;
-
-                await semaphore.WaitAsync();
+                var messageText = JsonConvert.SerializeObject(message);
+                var messageBytes = Encoding.UTF8.GetBytes(messageText);
 
             try
             {
@@ -131,12 +134,11 @@ internal class WebSocketService(
             finally
             {
                 semaphore.Release();
+                    }
+                });
 
-                tasks.Add(task);
             }
         }
-
-        await Task.WhenAll(tasks);
     }
 
     private async Task AddOrUpdateWebSocket(Guid playerIds, WebSocket newWebSocket)
