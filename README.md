@@ -1,6 +1,6 @@
 # Orleans Chat Sample Application
 
-This application accompanies the blogpost ["Microsoft Orleans: Managing Distributed State Without Losing Your Mind."](https://rushdownstudio.com/todo)
+This application accompanies the blogpost ["Microsoft Orleans: Managing Distributed State Without Losing Your Mind."](https://blog.rushdownstudio.com/microsoft-orleans-managing-distributed-state-without-losing-your-mind-2/)
 
 This is a sample text chat application built using the [Orleans framework](https://learn.microsoft.com/en-us/dotnet/orleans/overview).
 
