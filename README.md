@@ -1,23 +1,30 @@
-# Rushdown Rpc
+# Orleans Chat Sample Application
 
-## Run and deploy on local environment
+This application accompanies the blogpost ["Microsoft Orleans: Managing Distributed State Without Losing Your Mind."](https://rushdownstudio.com/todo)
 
-### Create / Start
+This is a sample text chat application built using the [Orleans framework](https://learn.microsoft.com/en-us/dotnet/orleans/overview).
+
+## Run and Deploy Locally
+
+This application uses [Docker, and Docker Compose](https://www.docker.com) to run locally with minimal setup.
+
+Installation, and usage instructions can be found on the official Docker website.
 
 ```sh
-docker-compose up -d
+# Start Docker containers
+$ docker-compose up -d
+# Stop the Docker Containers
+$ docker-compose down
 ```
 
-### down
+## Load Test
+
+This repository includes a simple load test script powered by [k6](https://k6.io/).
+
+It can be run using the following command:
 
 ```sh
-docker-compose down
-```
-
-## Spike Test
-
-```sh
-k6 run LoadTest/SpikeTest.js
+$ k6 run LoadTest/SpikeTest.js
 ```
 
 ```txt
